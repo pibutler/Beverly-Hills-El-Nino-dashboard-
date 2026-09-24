@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Beverly Hills Debris Flow &amp; Heavy Rain Watch</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" crossorigin="">
+<style>
+:root{
+  --bg:#0b1220; --panel:#111a2c; --panel2:#0e1626; --line:#22304a;
+  --ink:#e7edf7; --muted:#8fa1bd; --noteink:#c9d5ea;
+  --accent:#38bdf8; --accent2:#0ea5e9; --good:#22c55e; --warn:#f59e0b; --red:#dc2626;
+  --btn:#16223a; --btnink:#dbe6f8; --btnline:#2a3b5c;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f3f6fb; --panel:#ffffff; --panel2:#eef2f9; --line:#d9e2f0;
+    --ink:#0e1626; --muted:#54607a; --noteink:#1c2740;
+    --btn:#eef2f9; --btnink:#0e1626; --btnline:#c9d5ea;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:920px;margin:0 auto;padding:14px 14px 40px}
+header{padding-top:6px}
+h1{font-size:19px;margin:2px 0 2px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 10px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0}
+select,button,input[type=number],input[type=text],textarea{font:inherit;color:var(--btnink);background:var(--btn);border:1px solid var(--btnline);border-radius:8px;padding:7px 10px}
+button{cursor:pointer}
+button:hover{filter:brightness(1.12)}
+.small{font-size:12.5px;color:var(--muted)}
+.health{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.pill{font-size:12px;padding:4px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:var(--panel2)}
+.pill.ok{color:var(--good);border-color:var(--good)}
+.pill.bad{color:var(--red);border-color:var(--red)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0}
+h2{font-size:15px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 .tag{font-size:11px;font-weight:400;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:1px 8px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(max-width:560px){.grid2{grid-template-columns:1fr}}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat .n{font-size:22px;font-weight:700}
+.stat .l{font-size:12px;color:var(--muted)}
+.alertitem{border-left:4px solid var(--warn);background:var(--panel2);border-radius:8px;padding:8px 10px;margin:6px 0}
+.alertitem.severe{border-color:var(--red)}
+.note-ok{color:var(--good)}
+#thresholdBanner{display:none;color:#fff;background:var(--red);padding:16px 18px;border-radius:10px;margin-bottom:14px;font-size:17px;font-weight:600;animation:pulse 1.6s ease-in-out infinite}
+#thresholdBanner.show{display:block}
+#thresholdBanner .small2{display:block;font-weight:400;font-size:14px;margin-top:4px;opacity:.92}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55)}50%{box-shadow:0 0 0 10px rgba(220,38,38,0)}}
+.threshold-bar{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:end}
+.threshold-bar .field{display:flex;flex-direction:column;gap:3px}
+.threshold-bar label{font-size:13px;color:var(--muted)}
+.threshold-bar input[type=number]{width:90px}
+.threshold-bar .chk{flex-direction:row;align-items:center;gap:7px;font-size:14px;color:var(--noteink)}
+.threshold-bar .chk input{width:auto}
+#thresholdStatus{font-size:14px;color:var(--muted);margin-top:8px}
+#map{height:420px;border-radius:10px;border:1px solid var(--line);z-index:0}
+.layerbox{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0;font-size:13px;color:var(--noteink)}
+.layerbox label{display:flex;align-items:center;gap:6px}
+.marker-label{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:2px 6px;font-size:11px;color:var(--ink)}
+ul.ref{margin:6px 0 0 18px;padding:0}
+ul.ref li{margin:4px 0}
+textarea{width:100%;min-height:70px;resize:vertical}
+footer{color:var(--muted);font-size:12px;margin-top:18px;line-height:1.6}
+.no-print{}
+@media print{
+  .no-print{display:none!important}
+  body{background:#fff;color:#000}
+  section{border:1px solid #000;background:#fff}
+  #thresholdBanner{animation:none;border:2px solid #000;background:#fff!important;color:#000}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🌧️ Beverly Hills Debris Flow &amp; Heavy Rain Watch</h1>
+    <p class="sub">Hillside canyon monitoring for incident command — storm prep, threshold alerting, and debris-flow reference. Companion to Beverly Hills Wildfire Watch.</p>
+  </header>
+
+  <div class="controls no-print">
+    <select id="areaSelect" aria-label="Watch area"></select>
+    <button id="refreshBtn">↻ Refresh</button>
+    <button id="printBtn">🖨️ Briefing view</button>
+    <button id="themeBtn">🌓 Theme</button>
+  </div>
+
+  <div class="health no-print" id="health"></div>
+
+  <div id="thresholdBanner" role="alert"></div>
+
+  <details class="no-print" open>
+    <summary style="cursor:pointer;font-weight:600;font-size:15px;padding:4px 0">Alert thresholds<span class="small" id="thresholdSummary"></span></summary>
+    <section style="margin-top:8px">
+      <div class="threshold-bar">
+        <div class="field"><label for="thRate">Alert if rain rate ≥ (in/hr, proxy)</label><input id="thRate" type="number" min="0" max="5" step="0.05"></div>
+        <div class="field"><label for="th24">Alert if 24-hr total ≥ (in)</label><input id="th24" type="number" min="0" max="20" step="0.25"></div>
+        <div class="field chk"><input id="thNws" type="checkbox"><label for="thNws">Alert on new Flood/Flash Flood Watch or Warning</label></div>
+        <div class="field chk"><input id="thSound" type="checkbox"><label for="thSound">Play sound</label></div>
+        <div class="field"><button id="thTest" type="button">Test alert</button></div>
+      </div>
+      <div id="thresholdStatus"></div>
+      <p class="small">"Rain rate" is a proxy — NWS's public API reports precipitation in accumulation blocks (typically hourly near-term), not a true instantaneous rate. Treat this as an early-warning nudge, not a precise trigger, and confirm against official NWS/LA County Public Works products before acting. Settings save on this device only.</p>
+    </section>
+  </details>
+
+  <section id="alertsSec">
+    <h2>NWS Alerts <span class="tag" id="alertsTag">—</span></h2>
+    <div id="alerts">Loading…</div>
+  </section>
+
+  <section id="nowSec">
+    <h2>Rainfall Outlook <span class="tag" id="nowTag">—</span></h2>
+    <div class="grid2">
+      <div class="stat"><div class="n" id="statNow">—</div><div class="l">Current forecast</div></div>
+      <div class="stat"><div class="n" id="statPop">—</div><div class="l">Chance of precip (next period)</div></div>
+      <div class="stat"><div class="n" id="stat24">—</div><div class="l">Forecast total, next 24 hr</div></div>
+      <div class="stat"><div class="n" id="stat48">—</div><div class="l">Forecast total, next 48 hr</div></div>
+    </div>
+  </section>
+
+  <section id="obsSec">
+    <h2>Observed Rainfall (nearest station) <span class="tag" id="obsTag">—</span></h2>
+    <div id="obsRows">Loading…</div>
+  </section>
+
+  <section>
+    <h2>Debris-Flow Hazard Map</h2>
+    <div class="layerbox no-print">
+      <label><input type="checkbox" id="layerHazard"> Debris-flow susceptibility (CGS, statewide compiled polygons)</label>
+      <label><input type="checkbox" id="layerRoads" checked> Canyon road reference points</label>
+    </div>
+    <div id="map"></div>
+    <p class="small">The CGS layer shows generalized areas historically compiled as debris-flow susceptible (1:24,000 scale) — it is a planning reference, not a real-time hazard call and not valid at parcel scale. Canyon-road markers are approximate reference points, not official closure boundaries.</p>
+  </section>
+
+  <section>
+    <h2>Pre-Storm / Mitigation Reference</h2>
+    <p class="small">General planning prompts — verify against BHFD and LA County Public Works SOPs before acting; this is not a substitute for department policy.</p>
+    <ul class="ref">
+      <li>Cross-check forecast QPF against known slide-prone segments of Coldwater Canyon, Benedict Canyon, and Beverly Glen — these canyon roads have a documented history of closures in major storms.</li>
+      <li>Coordinate early with LA County Public Works / Flood Control on debris-basin status above the canyons and any pre-storm cleanout needs.</li>
+      <li>Confirm sandbag/k-rail staging locations and readiness ahead of forecast thresholds, not after rain begins.</li>
+      <li>Identify structures below steep slopes or within CGS-flagged polygons for a proactive welfare check or advisory.</li>
+      <li>Review evacuation routes out of canyon areas for redundancy if a primary route floods or slides.</li>
+      <li>Track storm-drain and catch-basin capacity at known chronic flooding points.</li>
+      <li>Re-verify all of the above against current BHFD Standards of Cover and any active LA County OES guidance for the storm.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Notes — <span id="notesAreaLabel">—</span></h2>
+    <textarea id="notes" class="no-print" placeholder="Local notes for this area (saved on this device)…"></textarea>
+    <div id="notesPrint" style="display:none"></div>
+  </section>
+
+  <footer>
+    Data sources: National Weather Service (api.weather.gov) for alerts, forecast, and observations; California Geological Survey Hazards Viewer for debris-flow susceptibility polygons (compiled 2018, generalized). This page runs entirely from live public feeds with no login, key, or backend — some sections may show "unavailable" if a source is down or blocks requests from a browser. Not an official warning system; always follow NWS and BHFD/LA County OES guidance directly. Marker locations are approximate reference points.
+  </footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js" crossorigin=""></script>
+<script>
+(function(){
+  "use strict";
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function storeGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function storeSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  function setHTML(id,html){ el(id).innerHTML = html; }
+  function quiet(e){ /* swallow */ }
+
+  function feedOK(id){ var p = el('pill-'+id); if(p){ p.className='pill ok'; p.textContent = p.dataset.label + ' ✓'; } }
+  function feedFail(id,msg){ var p = el('pill-'+id); if(p){ p.className='pill bad'; p.textContent = p.dataset.label + ' ✕'; p.title = msg||'unavailable'; } }
+  function healthInit(list){
+    var html = list.map(function(x){
+      return '<span class="pill" id="pill-'+x.id+'" data-label="'+esc(x.label)+'">'+esc(x.label)+' …</span>';
+    }).join('');
+    setHTML('health', html);
+  }
+
+  var AREAS = [
+    { key:'trousdale', name:'Trousdale Estates', lat:34.1060, lon:-118.4050 },
+    { key:'coldwater',  name:'Coldwater Canyon',  lat:34.1100, lon:-118.4055 },
+    { key:'benedict',   name:'Benedict Canyon',   lat:34.1010, lon:-118.4195 },
+    { key:'bhglen',     name:'Beverly Glen Canyon', lat:34.0950, lon:-118.4350 },
+    { key:'franklin',   name:'Franklin Canyon',   lat:34.1150, lon:-118.4130 },
+    { key:'nichols',    name:'Nichols Canyon (LAFD jurisdiction)', lat:34.1170, lon:-118.3550 }
+  ];
+
+  var CANYON_ROADS = [
+    { name:'Coldwater Canyon Dr @ Mulholland Dr', lat:34.1329, lon:-118.4067, note:'Known slide point in major storms — approximate.' },
+    { name:'Coldwater Canyon Dr @ Sunset Blvd', lat:34.0897, lon:-118.3999, note:'South approach — approximate.' },
+    { name:'Benedict Canyon Dr @ Sunset Blvd', lat:34.0870, lon:-118.4176, note:'South approach — approximate.' },
+    { name:'Beverly Glen Blvd @ Sunset Blvd', lat:34.0824, lon:-118.4308, note:'South approach — approximate.' },
+    { name:'Franklin Canyon (park entrance area)', lat:34.1150, lon:-118.4130, note:'Approximate.' }
+  ];
+
+  var CGS_URL = 'https://cgsarcimage.mines.edu/arcgis/rest/services/Hazards/Hazards_Viewer/MapServer/9/query';
+  var CGS_BBOX = { minLon:-118.47, minLat:34.04, maxLon:-118.33, maxLat:34.16 };
+
+  var state = { area: AREAS[0], cond:{ fcRate:null, fc24:null, fc48:null, obRate:null }, seenAlertIds:{}, lastNewAlertNames:[] };
+  try { state.seenAlertIds = JSON.parse(storeGet('bhrw.seenAlertIds')||'{}')||{}; } catch(e){ state.seenAlertIds = {}; }
+
+  // ---------- fetch helper ----------
+  function fetchJSON(url, opts){
+    opts = opts || {};
+    var ctrl = new AbortController();
+    var t = setTimeout(function(){ ctrl.abort(); }, opts.timeout || 12000);
+    return fetch(url, { signal: ctrl.signal, headers: opts.headers || {} }).then(function(r){
+      clearTimeout(t);
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    }).catch(function(e){ clearTimeout(t); throw e; });
+  }
+  function inTo(mm){ return mm==null ? null : mm/25.4; }
+  function fmtIn(n){ return n==null ? '—' : n.toFixed(2)+'"'; }
+
+  // ---------- area picker ----------
+  function buildPicker(){
+    el('areaSelect').innerHTML = AREAS.map(function(a){ return '<option value="'+a.key+'">'+esc(a.name)+'</option>'; }).join('');
+    el('areaSelect').addEventListener('change', function(){ setArea(this.value); });
+  }
+  function setArea(key){
+    var a = AREAS.find(function(x){ return x.key===key; }) || AREAS[0];
+    state.area = a;
+    el('areaSelect').value = a.key;
+    el('notesAreaLabel').textContent = a.name;
+    state.cond = { fcRate:null, fc24:null, fc48:null, obRate:null };
+    loadNotes();
+    loadAll();
+    if (state.map) state.map.setView([a.lat, a.lon], 13);
+  }
+
+  // ---------- notes ----------
+  function notesKey(){ return 'bhrw.notes.'+state.area.key; }
+  function loadNotes(){
+    el('notes').value = storeGet(notesKey()) || '';
+  }
+  el('notes') && el('notes').addEventListener && null;
+
+  // ---------- alerts ----------
+  function loadAlerts(){
+    var a = state.area;
+    fetchJSON('https://api.weather.gov/alerts/active?point='+a.lat+','+a.lon)
+      .then(function(j){
+        feedOK('alerts');
+        var feats = (j && j.features) || [];
+        renderAlerts(feats);
+      })
+      .catch(function(e){ feedFail('alerts', e.message); setHTML('alerts','<span class="small">Alerts feed unavailable right now.</span>'); });
+  }
+  function renderAlerts(feats){
+    var relevant = feats.filter(function(f){
+      var ev = ((f.properties||{}).event || '');
+      return /flood|flash flood|winter storm|high wind|wind advisory|debris|mud/i.test(ev);
+    });
+    // track new ids for threshold alerting
+    var fresh = [], stillSeen = {};
+    feats.forEach(function(f){
+      var p = f.properties||{};
+      var id = p.id || (p.event||'')+'|'+(p.onset||p.effective||'');
+      var isFlood = /flood|flash flood/i.test(String(p.event||''));
+      stillSeen[id]=1;
+      if (isFlood && !state.seenAlertIds[id]) fresh.push(p.event||'NWS alert');
+    });
+    state.seenAlertIds = stillSeen;
+    try { storeSet('bhrw.seenAlertIds', JSON.stringify(stillSeen)); } catch(e){ quiet(e); }
+    state.lastNewAlertNames = fresh;
+
+    el('alertsTag').textContent = relevant.length ? (relevant.length+' active') : 'none active';
+    if (!relevant.length){ setHTML('alerts','<span class="note-ok">No active flood/storm alerts for this point.</span>'); }
+    else {
+      setHTML('alerts', relevant.map(function(f){
+        var p = f.properties||{};
+        var sev = /extreme|severe/i.test(String(p.severity||'')) ? ' severe' : '';
+        return '<div class="alertitem'+sev+'"><strong>'+esc(p.event||'Alert')+'</strong> — '+esc(p.headline||'')+
+          '<div class="small">'+esc(p.areaDesc||'')+'</div></div>';
+      }).join(''));
+    }
+    if (fresh.length) checkThresholds();
+  }
+
+  // ---------- forecast (now + QPF) ----------
+  function loadForecast(){
+    var a = state.area;
+    fetchJSON('https://api.weather.gov/points/'+a.lat+','+a.lon).then(function(pt){
+      var props = pt.properties || {};
+      var hourlyUrl = props.forecastHourly;
+      var gridUrl = props.forecastGridData;
+      var p1 = hourlyUrl ? fetchJSON(hourlyUrl) : Promise.resolve(null);
+      var p2 = gridUrl ? fetchJSON(gridUrl) : Promise.resolve(null);
+      var p3 = props.observationStations ? fetchJSON(props.observationStations) : Promise.resolve(null);
+      return Promise.all([p1,p2,p3]);
+    }).then(function(res){
+      feedOK('forecast');
+      var hourly = res[0], grid = res[1], stations = res[2];
+      renderNow(hourly);
+      renderQPF(grid);
+      if (stations) loadObserved(stations);
+      else { feedFail('obs','no stations'); setHTML('obsRows','<span class="small">No nearby station list returned.</span>'); }
+    }).catch(function(e){
+      feedFail('forecast', e.message);
+      setHTML('statNow',''); el('nowTag').textContent = 'unavailable';
+      feedFail('obs','forecast chain failed'); setHTML('obsRows','<span class="small">Observed data unavailable right now.</span>');
+    });
+  }
+  function renderNow(hourly){
+    var periods = (hourly && hourly.properties && hourly.properties.periods) || [];
+    var p0 = periods[0];
+    el('nowTag').textContent = p0 ? 'live' : 'unavailable';
+    el('statNow').textContent = p0 ? (p0.shortForecast || '—') : '—';
+    var pop = p0 && p0.probabilityOfPrecipitation ? p0.probabilityOfPrecipitation.value : null;
+    el('statPop').textContent = pop==null ? '—' : pop+'%';
+  }
+  function parseISODurHours(iv){
+    // iv like "2026-09-25T06:00:00+00:00/PT6H" -> {start:Date, hours:Number}
+    var parts = String(iv).split('/');
+    var start = new Date(parts[0]);
+    var dur = parts[1] || 'PT1H';
+    var h = 0;
+    var m = /PT(?:(\d+)D)?(?:(\d+)H)?(?:(\d+)M)?/.exec(dur);
+    if (m){ h += m[1]? parseInt(m[1])*24:0; h += m[2]? parseInt(m[2]):0; h += m[3]? parseInt(m[3])/60:0; }
+    return { start:start, hours:h||1 };
+  }
+  function renderQPF(grid){
+    var series = grid && grid.properties && grid.properties.quantitativePrecipitation;
+    var values = (series && series.values) || [];
+    if (!values.length){ el('stat24').textContent='—'; el('stat48').textContent='—'; state.cond.fc24=null; state.cond.fc48=null; state.cond.fcRate=null; checkThresholds(); return; }
+    var now = new Date();
+    var end24 = new Date(now.getTime()+24*3600e3);
+    var end48 = new Date(now.getTime()+48*3600e3);
+    var sum24=0, sum48=0, firstRateMm=null;
+    values.forEach(function(v){
+      var iv = parseISODurHours(v.validTime);
+      var mm = typeof v.value === 'number' ? v.value : 0;
+      if (iv.start < end48) sum48 += mm;
+      if (iv.start < end24) sum24 += mm;
+      if (firstRateMm==null && iv.start >= new Date(now.getTime()-3600e3)) firstRateMm = mm / Math.max(iv.hours,1);
+    });
+    var in24 = inTo(sum24), in48 = inTo(sum48);
+    el('stat24').textContent = fmtIn(in24);
+    el('stat48').textContent = fmtIn(in48);
+    state.cond.fc24 = in24; state.cond.fc48 = in48;
+    state.cond.fcRate = firstRateMm==null ? null : inTo(firstRateMm);
+    checkThresholds();
+  }
+
+  // ---------- observed ----------
+  function loadObserved(stationsResp){
+    var feats = (stationsResp && stationsResp.features) || [];
+    var top = feats.slice(0,3);
+    if (!top.length){ feedFail('obs','no stations'); setHTML('obsRows','<span class="small">No nearby stations.</span>'); return; }
+    Promise.all(top.map(function(f){
+      var id = f.properties && f.properties.stationIdentifier;
+      var name = f.properties && f.properties.name;
+      if (!id) return Promise.resolve(null);
+      return fetchJSON('https://api.weather.gov/stations/'+id+'/observations/latest')
+        .then(function(o){ return { id:id, name:name, o:o }; })
+        .catch(function(){ return { id:id, name:name, o:null }; });
+    })).then(function(rs){
+      var rows = '', gotRate = false;
+      rs.forEach(function(r){
+        if (!r) return;
+        var props = (r.o && r.o.properties) || {};
+        var mm = props.precipitationLastHour && props.precipitationLastHour.value;
+        var text = (mm==null) ? 'not reporting precipitation' : fmtIn(inTo(mm))+' in last hour';
+        if (mm!=null && !gotRate){ state.cond.obRate = inTo(mm); gotRate = true; }
+        rows += '<div class="small">'+esc(r.name||r.id)+' ('+esc(r.id)+'): '+text+'</div>';
+      });
+      if (!gotRate) state.cond.obRate = null;
+      feedOK('obs');
+      el('obsTag').textContent = 'live';
+      setHTML('obsRows', rows || '<span class="small">No station data returned.</span>');
+      checkThresholds();
+    }).catch(function(e){
+      feedFail('obs', e.message);
+      setHTML('obsRows','<span class="small">Observed data unavailable right now.</span>');
+    });
+  }
+
+  // ---------- threshold alerting ----------
+  var alertAudioCtx=null, alertArmed=false, lastAlertKey='';
+  function armAlertAudio(){
+    if (alertArmed) return; alertArmed = true;
+    try { alertAudioCtx = new (window.AudioContext||window.webkitAudioContext)(); } catch(e){ quiet(e); }
+  }
+  function playAlertBeep(){
+    if (!el('thSound').checked) return;
+    try{
+      if (!alertAudioCtx) armAlertAudio();
+      if (!alertAudioCtx) return;
+      if (alertAudioCtx.state==='suspended') alertAudioCtx.resume();
+      var t0 = alertAudioCtx.currentTime;
+      [0,0.35,0.7].forEach(function(off){
+        var o=alertAudioCtx.createOscillator(), g=alertAudioCtx.createGain();
+        o.type='square'; o.frequency.value=740;
+        g.gain.setValueAtTime(0.0001,t0+off);
+        g.gain.exponentialRampToValueAtTime(0.18,t0+off+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,t0+off+0.28);
+        o.connect(g); g.connect(alertAudioCtx.destination);
+        o.start(t0+off); o.stop(t0+off+0.3);
+      });
+    }catch(e){ quiet(e); }
+  }
+  function loadThresholdSettings(){
+    el('thRate').value = storeGet('bhrw.thRate') || 0.5;
+    el('th24').value = storeGet('bhrw.th24') || 3;
+    el('thNws').checked = storeGet('bhrw.thNws') !== '0';
+    el('thSound').checked = storeGet('bhrw.thSound') !== '0';
+    renderThresholdSummary();
+  }
+  function renderThresholdSummary(){
+    el('thresholdSummary').textContent = ' — rate ≥ '+el('thRate').value+' in/hr, 24-hr ≥ '+el('th24').value+'"'+(el('thNws').checked?', new flood alerts':'');
+  }
+  ['thRate','th24'].forEach(function(id){
+    el(id).addEventListener('change', function(){
+      storeSet('bhrw.'+(id==='thRate'?'thRate':'th24'), el(id).value);
+      renderThresholdSummary(); checkThresholds();
+    });
+  });
+  el('thNws').addEventListener('change', function(){ storeSet('bhrw.thNws', el('thNws').checked?'1':'0'); renderThresholdSummary(); });
+  el('thSound').addEventListener('change', function(){ storeSet('bhrw.thSound', el('thSound').checked?'1':'0'); if (el('thSound').checked) armAlertAudio(); });
+  el('thTest').addEventListener('click', function(){
+    armAlertAudio();
+    showBanner('Test alert — this is only a test.', ['Rain-rate, 24-hr total, and flood-warning checks are working.']);
+    playAlertBeep();
+  });
+  function showBanner(headline, lines){
+    var b = el('thresholdBanner');
+    b.innerHTML = '⚠️ '+esc(headline)+(lines&&lines.length? lines.map(function(l){return '<span class="small2">'+esc(l)+'</span>';}).join(''):'');
+    b.className = 'show';
+  }
+  function hideBanner(){ var b=el('thresholdBanner'); b.className=''; b.innerHTML=''; }
+  function checkThresholds(){
+    if (!el('thRate')) return;
+    var rateT = parseFloat(el('thRate').value), d24T = parseFloat(el('th24').value);
+    var rate = [state.cond.obRate, state.cond.fcRate].filter(function(v){return v!=null;});
+    var worstRate = rate.length ? Math.max.apply(null, rate) : null;
+    var d24 = state.cond.fc24;
+    var reasons = [];
+    if (!isNaN(rateT) && worstRate!=null && worstRate>=rateT) reasons.push('Rain-rate proxy '+worstRate.toFixed(2)+' in/hr is at or above your '+rateT+' in/hr threshold.');
+    if (!isNaN(d24T) && d24!=null && d24>=d24T) reasons.push('Forecast 24-hr total '+d24.toFixed(2)+'" is at or above your '+d24T+'" threshold.');
+    if (el('thNws').checked && state.lastNewAlertNames.length) reasons.push('New flood alert: '+state.lastNewAlertNames.join(', ')+'.');
+    var key = reasons.join('|');
+    if (reasons.length){
+      el('thresholdStatus').innerHTML = '<span style="color:#f87171;font-weight:600">Conditions at or past threshold for '+esc(state.area.name)+'.</span>';
+      showBanner('Threshold alert for '+state.area.name, reasons);
+      if (key !== lastAlertKey) playAlertBeep();
+    } else {
+      el('thresholdStatus').textContent = (worstRate==null && d24==null) ? 'Waiting for the first reading…' :
+        'Below your thresholds right now (rate '+(worstRate==null?'—':worstRate.toFixed(2)+' in/hr')+', 24-hr '+(d24==null?'—':d24.toFixed(2)+'"')+').';
+      hideBanner();
+    }
+    lastAlertKey = key;
+  }
+
+  // ---------- map ----------
+  function initMap(){
+    var m = L.map('map', { scrollWheelZoom:false }).setView([state.area.lat, state.area.lon], 13);
+    L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+      maxZoom: 17, attribution: 'Map: OpenTopoMap / OSM contributors'
+    }).addTo(m);
+    state.map = m;
+    state.roadLayer = L.layerGroup();
+    CANYON_ROADS.forEach(function(r){
+      L.circleMarker([r.lat,r.lon], { radius:6, color:'#38bdf8', weight:2, fillColor:'#0ea5e9', fillOpacity:.8 })
+        .bindPopup('<strong>'+esc(r.name)+'</strong><br>'+esc(r.note))
+        .addTo(state.roadLayer);
+    });
+    state.roadLayer.addTo(m);
+    state.hazardLayer = null;
+    el('layerRoads').addEventListener('change', function(){
+      if (this.checked) state.roadLayer.addTo(m); else m.removeLayer(state.roadLayer);
+    });
+    el('layerHazard').addEventListener('change', function(){
+      if (this.checked) loadHazardLayer(); else if (state.hazardLayer) m.removeLayer(state.hazardLayer);
+    });
+  }
+  function loadHazardLayer(){
+    if (state.hazardLayer){ state.hazardLayer.addTo(state.map); return; }
+    var b = CGS_BBOX;
+    var url = CGS_URL + '?where=1%3D1&geometry='+b.minLon+','+b.minLat+','+b.maxLon+','+b.maxLat+
+      '&geometryType=esriGeometryEnvelope&inSR=4326&spatialRel=esriSpatialRelIntersects&outFields=County,Report_ID,Hyperlink&outSR=4326&f=geojson';
+    fetchJSON(url, { timeout: 15000 }).then(function(gj){
+      feedOK('hazard');
+      state.hazardLayer = L.geoJSON(gj, {
+        style: { color:'#000', weight:1, fillColor:'#dc2626', fillOpacity:.32 },
+        onEachFeature: function(f, layer){
+          var p = f.properties||{};
+          var link = p.Hyperlink ? '<br><a href="'+esc(p.Hyperlink)+'" target="_blank" rel="noopener">source report</a>' : '';
+          layer.bindPopup('<strong>Debris-flow susceptible area</strong><br>'+esc(p.County||'')+link);
+        }
+      }).addTo(state.map);
+    }).catch(function(e){
+      feedFail('hazard', e.message);
+      el('layerHazard').checked = false;
+      alert('Debris-flow layer is unavailable right now (the CGS map service may be blocking browser requests or is down). Try again later, or view it directly on the CGS Hazards Viewer.');
+    });
+  }
+
+  // ---------- boot ----------
+  function loadAll(){
+    healthInit([
+      {id:'alerts', label:'NWS Alerts'},
+      {id:'forecast', label:'Forecast'},
+      {id:'obs', label:'Observed'},
+      {id:'hazard', label:'Hazard Map'}
+    ]);
+    loadAlerts();
+    loadForecast();
+  }
+  el('refreshBtn').addEventListener('click', loadAll);
+  el('printBtn').addEventListener('click', function(){
+    el('notesPrint').style.display = 'block';
+    el('notesPrint').textContent = el('notes').value;
+    window.print();
+  });
+  el('themeBtn').addEventListener('click', function(){
+    var root = document.documentElement;
+    var cur = root.getAttribute('data-theme');
+    root.setAttribute('data-theme', cur==='dark' ? 'light' : 'dark');
+    storeSet('bhrw.theme', root.getAttribute('data-theme'));
+  });
+  (function(){ var t = storeGet('bhrw.theme'); if (t) document.documentElement.setAttribute('data-theme', t); })();
+
+  window.addEventListener('beforeunload', function(){
+    storeSet(notesKey(), el('notes').value);
+  });
+  el('notes').addEventListener('input', function(){ storeSet(notesKey(), this.value); });
+
+  loadThresholdSettings();
+  buildPicker();
+  initMap();
+  setArea(AREAS[0].key);
+  setInterval(loadAll, 15*60*1000);
+})();
+</script>
+</body>
+</html>
