@@ -212,7 +212,7 @@ footer{color:var(--muted);font-size:12px;margin-top:18px;line-height:1.6}
   </section>
 
   <footer>
-    Data sources: National Weather Service (api.weather.gov) for alerts, warning polygons, forecast, and observations; Iowa Environmental Mesonet NEXRAD radar mosaic; LA County Public Works (post-fire debris-flow hazard areas and impacted properties, debris basins, storm drain system); LA County Location Management System (fire stations); CAL FIRE FRAP and NIFC WFIGS (fire perimeters); California Geological Survey Map Sheet 58 (landslide susceptibility); FEMA National Flood Hazard Layer. Base maps: OpenStreetMap/CARTO, OpenTopoMap, Esri World Imagery. This page runs entirely from live public feeds with no login, key, or backend — some sections may show "unavailable" if a source is down or blocks requests from a browser. Not an official warning system; always follow NWS and BHFD/LA County OES guidance directly. Marker locations are approximate reference points.
+    Data sources: National Weather Service (api.weather.gov) for alerts, warning polygons, forecast, and observations; Iowa Environmental Mesonet NEXRAD radar mosaic; LA County Public Works (post-fire debris-flow hazard areas and impacted properties, debris basins, storm drain system); LA County Location Management System (fire stations); CAL FIRE FRAP and NIFC WFIGS (fire perimeters); California Geological Survey Map Sheet 58 (landslide susceptibility); FEMA National Flood Hazard Layer. Base maps: Esri World Street Map (OpenStreetMap fallback), OpenTopoMap, Esri World Imagery. This page runs entirely from live public feeds with no login, key, or backend — some sections may show "unavailable" if a source is down or blocks requests from a browser. Not an official warning system; always follow NWS and BHFD/LA County OES guidance directly. Marker locations are approximate reference points.
   </footer>
 </div>
 
@@ -819,7 +819,18 @@ footer{color:var(--muted);font-size:12px;margin-top:18px;line-height:1.6}
 
   // ---- map state & UI ----
   var BASES = {
-    streets: function(){ return [ L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { subdomains:'abcd', maxZoom:19, attribution:'© OpenStreetMap contributors © CARTO' }) ]; },
+    // Esri World Street Map (no key). If it fails, fall back to OpenStreetMap's standard tiles.
+    streets: function(){
+      var esri = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Map © Esri, HERE, Garmin, © OpenStreetMap contributors' });
+      var errs = 0;
+      esri.on('tileerror', function(){
+        if (++errs !== 4 || mapUI.base !== 'streets') return;
+        state.map.removeLayer(esri);
+        var osm = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19, attribution:'© OpenStreetMap contributors' }).addTo(state.map);
+        mapUI.baseLayers = [osm];
+      });
+      return [ esri ];
+    },
     topo: function(){ return [ L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom:17, attribution:'Map: OpenTopoMap / OSM contributors' }) ]; },
     sat: function(){ return [
       L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, attribution:'Imagery © Esri, Maxar, Earthstar Geographics' }),
